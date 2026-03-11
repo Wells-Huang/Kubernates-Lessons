@@ -228,3 +228,15 @@ docker run --rm -p 3000:3000 <你的帳號>/week1-task1:multiarch
 - 多架構 image 通常要用 `--push` 推到 registry，因為 `--load` 一次只能載入單一平台到本機 Docker。
 - 這個範例沒有安裝任何原生編譯套件，因此很適合拿來示範 `amd64` 與 `arm64` 共用同一份 Dockerfile。
 - 若要交作業，可以附上 `docker buildx imagetools inspect` 的結果截圖，以及兩台 VM 的 `curl` 回傳結果截圖。
+
+實際驗證結果：
+
+1. 本機 x64 環境已成功執行容器，HTTP 回應內容中的 `arch` 為 `x64`，表示 Docker 已拉取並執行 `linux/amd64` 版本的 image。
+
+![x64 驗證結果](./x64-verify.png)
+
+2. 使用 `docker buildx imagetools inspect wellshuang814/week1-task1:multiarch` 檢查 manifest，可看到至少包含 `linux/amd64` 與 `linux/arm64` 兩種平台，代表此 tag 已發佈為多架構 image。
+
+![manifest 檢查結果](./manifest-inspect.png)
+
+3. 後續若要補齊 ARM 實機驗證，可在 ARM64 Linux VM 上直接執行同一個 tag，並以 `curl http://127.0.0.1:3000` 確認回傳 `arch: "arm64"`。
