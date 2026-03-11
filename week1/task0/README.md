@@ -1,4 +1,4 @@
-## Dockerfile 優化
+﻿## Dockerfile 優化
 
 1. 以下為一份 TypeScript 的 Dockerfile，請說明有哪些方向可以優化此 Dockerfile。
 ```dockerfile
@@ -153,15 +153,15 @@ docker login
 ```bash
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
-  -t <你的帳號>/week1-task1:multiarch \
+  -t <你的帳號>/week1-task0:multiarch \
   --push \
-  week1/task1
+  week1/task0
 ```
 
 4. 檢查 manifest 是否真的包含兩種架構。
 
 ```bash
-docker buildx imagetools inspect <你的帳號>/week1-task1:multiarch
+docker buildx imagetools inspect <你的帳號>/week1-task0:multiarch
 ```
 
 如果成功，輸出中應該看得到至少：
@@ -182,7 +182,7 @@ linux/arm64
 2. 在兩台 VM 都安裝 Docker，然後分別執行：
 
 ```bash
-docker run --rm -p 3000:3000 <你的帳號>/week1-task1:multiarch
+docker run --rm -p 3000:3000 <你的帳號>/week1-task0:multiarch
 ```
 
 3. 另外開一個 terminal 呼叫：
@@ -212,13 +212,13 @@ curl http://127.0.0.1:3000
 1. 先確認 manifest：
 
 ```bash
-docker buildx imagetools inspect <你的帳號>/week1-task1:multiarch
+docker buildx imagetools inspect <你的帳號>/week1-task0:multiarch
 ```
 
 2. 若主機本身是 x86，直接執行：
 
 ```bash
-docker run --rm -p 3000:3000 <你的帳號>/week1-task1:multiarch
+docker run --rm -p 3000:3000 <你的帳號>/week1-task0:multiarch
 ```
 
 3. 若主機本身是 ARM，執行同一條指令即可，Docker 會自動拉取相符架構的 image。
@@ -235,8 +235,9 @@ docker run --rm -p 3000:3000 <你的帳號>/week1-task1:multiarch
 
 ![x64 驗證結果](./x64-verify.png)
 
-2. 使用 `docker buildx imagetools inspect wellshuang814/week1-task1:multiarch` 檢查 manifest，可看到至少包含 `linux/amd64` 與 `linux/arm64` 兩種平台，代表此 tag 已發佈為多架構 image。
+2. 使用 `docker buildx imagetools inspect <你的帳號>/week1-task0:multiarch` 檢查 manifest，可看到至少包含 `linux/amd64` 與 `linux/arm64` 兩種平台，代表此 tag 已發佈為多架構 image。
 
 ![manifest 檢查結果](./manifest-inspect.png)
 
 3. 後續若要補齊 ARM 實機驗證，可在 ARM64 Linux VM 上直接執行同一個 tag，並以 `curl http://127.0.0.1:3000` 確認回傳 `arch: "arm64"`。
+
