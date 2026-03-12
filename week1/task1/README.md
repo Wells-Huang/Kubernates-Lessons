@@ -319,15 +319,20 @@ X-Proxy-Layer: web-server-new
 接著確認proxy-pod的log
 kubectl logs -l app=nginx-proxy --tail=20 --prefix=true
 看到nginx-proxy的log，確認有新的request紀錄
+```
 [pod/web-server-new-b4d9cfd4d-zxslc/nginx-proxy] 10.244.0.24 - - [12/Mar/2026:14:58:39 +0000] "GET / HTTP/1.1" 200 612 "-" "curl/8.12.1" "-"
+```
 
 接著確認web-server-new-pod的log
 kubectl logs -l app=nginx --tail=20 --prefix=true，看到web-server-new-pod的log，確認有新的request紀錄
+```
 [pod/web-server-77bc6bd484-gcbk6/nginx] 10.244.0.22 - - [12/Mar/2026:14:58:39 +0000] "GET / HTTP/1.0" 200 612 "-" "curl/8.12.1" "10.244.0.24"
-
+```
 再對外測試，跑 minikube service web-server-service-new -p task1 --url
 http://127.0.0.1:63754
 接著執行curl，確認本機對外存取也成功。
+
+```
 PS C:\Kubernates-Lessons\week1\task1> curl.exe -i http://127.0.0.1:63754
 HTTP/1.1 200 OK
 Server: nginx/1.27.5
@@ -339,4 +344,4 @@ Last-Modified: Tue, 04 Dec 2018 14:44:49 GMT
 ETag: "5c0692e1-264"
 Accept-Ranges: bytes
 X-Proxy-Layer: web-server-new
-
+```
