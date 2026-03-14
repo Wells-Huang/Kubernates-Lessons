@@ -7,7 +7,7 @@ k9s:
       - k9s-lab
       - default
   view:
-    active: v1/pods
+    active: xray dp
   featureGates:
     nodeShell: false
   proxy: null

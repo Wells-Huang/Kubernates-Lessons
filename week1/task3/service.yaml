@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-probe-service
+  namespace: probe-lab
+spec:
+  type: ClusterIP
+  selector:
+    app: nginx-probe-demo
+  ports:
+    - port: 80
+      targetPort: 80
