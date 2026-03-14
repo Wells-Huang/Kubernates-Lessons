@@ -1,4 +1,4 @@
-## 實作題
+﻿## 實作題
 ## 1. 撰寫一個名為 deployment.yaml 的檔案，並用 kubectl 在本地 cluster 創建以下服務。
 ```
 類型： Deployment

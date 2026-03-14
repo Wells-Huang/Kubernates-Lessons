@@ -1,0 +1,13 @@
+k9s:
+  cluster: task1
+  namespace:
+    active: k9s-lab
+    lockFavorites: false
+    favorites:
+      - k9s-lab
+      - default
+  view:
+    active: v1/pods
+  featureGates:
+    nodeShell: false
+  proxy: null
