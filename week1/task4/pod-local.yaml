@@ -1,0 +1,39 @@
+﻿apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-reader
+  namespace: sa-lab
+spec:
+  serviceAccountName: pod-reader-sa
+  automountServiceAccountToken: false
+  restartPolicy: Never
+  containers:
+    - name: pod-reader
+      image: task4-pod-reader:local
+      imagePullPolicy: IfNotPresent
+      env:
+        - name: TARGET_NAMESPACE
+          value: probe-lab
+      volumeMounts:
+        - name: kube-api-access
+          mountPath: /var/run/secrets/pod-reader
+          readOnly: true
+  volumes:
+    - name: kube-api-access
+      projected:
+        defaultMode: 420
+        sources:
+          - serviceAccountToken:
+              path: token
+              expirationSeconds: 3600
+          - configMap:
+              name: kube-root-ca.crt
+              items:
+                - key: ca.crt
+                  path: ca.crt
+          - downwardAPI:
+              items:
+                - path: namespace
+                  fieldRef:
+                    apiVersion: v1
+                    fieldPath: metadata.namespace
