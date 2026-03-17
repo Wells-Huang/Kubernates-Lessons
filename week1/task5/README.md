@@ -26,6 +26,22 @@
 - 工作負載部署：`apply-workload.ps1`
 - 工作負載清理：`cleanup-workload.ps1`
 
+## 為什麼選擇 Linode LKE？
+
+與三大公有雲（AWS、GCP、Azure）相比，Linode 主打的是**「簡單」**與**「高性價比」**，特別適合學習與中小型專案。
+
+**Linode 的強處：**
+- **學習曲線平緩：** 介面直覺，保留最核心的雲端資源，不需要面對數百種複雜的服務與 IAM 權限設定。
+- **計費透明可預期：** 統一定價且每台機器皆附贈大量出站流量（Data Transfer Out），不易產生隱藏費用的天價帳單。
+- **高性價比：** 相同規格下，運算資源的價格相對親民。
+
+**Linode Kubernetes Engine (LKE) 的特別之處：**
+- **Control Plane 免費：** 這是 LKE 最大的亮點。AWS EKS 等服務即便不跑應用程式，每月也要支付約 $73 美金的管理費。而 LKE 的控制平面（API Server、etcd 等）是免費的，你只需要為實際開出來的 Worker Node 運算節點付費。
+- **整合度高且開箱即用：** 當設定 Service Type 為 `LoadBalancer` 或是需要 Persistent Volumes 時，LKE 會在背後自動向 Linode 申請 NodeBalancer 或 Block Storage 並串接好。
+- **部署極度快速：** 建立一個 K8s 叢集通常只需幾分鐘，比許多傳統公有雲快上許多。
+
+在這項任務中使用 LKE，可以讓你以極低的負擔體驗「真實雲端環境上的全代管 Kubernetes」，並練習 Terraform IaC 的完整操作。
+
 ## 目錄結構
 
 ```text
