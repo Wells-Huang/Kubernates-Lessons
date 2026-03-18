@@ -1,0 +1,14 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - secret.yaml
+  - web-service.yaml
+  - web-deployment.yaml
+  - nginx-configmap.yaml
+  - nginx-deployment.yaml
+  - nginx-service.yaml
+  - redis-headless-service.yaml
+  - redis-service.yaml
+  - redis-statefulset.yaml
+  - debug-pod.yaml

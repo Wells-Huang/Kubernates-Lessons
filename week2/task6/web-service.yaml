@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-service
+  namespace: week2-task6
+spec:
+  selector:
+    app: task6-web
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
