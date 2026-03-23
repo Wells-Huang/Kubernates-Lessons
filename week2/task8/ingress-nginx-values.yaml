@@ -1,0 +1,13 @@
+controller:
+  ingressClassResource:
+    name: nginx
+    default: false
+  ingressClass: nginx
+  watchIngressWithoutClass: false
+  replicaCount: 1
+  service:
+    type: LoadBalancer
+    externalTrafficPolicy: Cluster
+
+defaultBackend:
+  enabled: false
