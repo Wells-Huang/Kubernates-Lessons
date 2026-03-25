@@ -1,4 +1,4 @@
-﻿## 實作題
+## 實作題
 ## 1. 撰寫一個名為 deployment.yaml 的檔案，並用 kubectl 在本地 cluster 創建以下服務。
 ```
 類型： Deployment
@@ -323,8 +323,8 @@ kubectl logs -l app=nginx-proxy --tail=20 --prefix=true
 [pod/web-server-new-b4d9cfd4d-zxslc/nginx-proxy] 10.244.0.24 - - [12/Mar/2026:14:58:39 +0000] "GET / HTTP/1.1" 200 612 "-" "curl/8.12.1" "-"
 ```
 
-接著確認web-server-new-pod的log
-kubectl logs -l app=nginx --tail=20 --prefix=true，看到web-server-new-pod的log，確認有新的request紀錄
+接著確認原本的 web-server pod 的 log
+kubectl logs -l app=nginx --tail=20 --prefix=true，看到原本 web-server pod 的 log，確認有新的 request 紀錄
 ```
 [pod/web-server-77bc6bd484-gcbk6/nginx] 10.244.0.22 - - [12/Mar/2026:14:58:39 +0000] "GET / HTTP/1.0" 200 612 "-" "curl/8.12.1" "10.244.0.24"
 ```
