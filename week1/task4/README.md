@@ -4,119 +4,174 @@
 
 這份 `README.md` 使用 UTF-8 編碼。
 
-## 需求拆解
+## 題目要求
 
-1. 建立可呼叫 Kubernetes API 的程式
-2. 把程式打包成 Image
-3. 建立 `ServiceAccount`、`Role`、`RoleBinding`
-4. 用 Projected Volume 掛載 SA token，讓 Pod 在執行時呼叫 API，並把結果印到 logs
+1. 參考 ServiceAccount 與 Pod 設定相關官方文件
+2. 使用任一程式語言撰寫程式，呼叫 Kubernetes API 取得指定 namespace 的 Pod 列表
+3. 將程式打包成 image
+4. 使用 Projected Volume 掛載 ServiceAccount token
+5. 最終可在 Pod logs 中看到類似 `kubectl get pods` 的結果
+6. 將 image push 到 public Docker Hub registry
 
 ## 參考文件
 
 - [Configure Service Accounts for Pods](https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/)
 - [Service Accounts](https://kubernetes.io/docs/concepts/security/service-accounts/)
 
-## 本實作重點
+## 本題實作重點
 
-- Pod 使用 `serviceAccountName` 指定身份
-- Pod 設定 `automountServiceAccountToken: false`，避免使用預設自動掛載
-- 改用 `projected` volume 明確掛載 token、CA 憑證與 namespace 資訊
-- 透過 `Role` + `RoleBinding` 只授權讀取 `probe-lab` namespace 內的 Pods
+- `sa-lab`：放置負責呼叫 Kubernetes API 的 `pod-reader`
+- `probe-lab`：作為被查詢的目標 namespace
+- `ServiceAccount`：`pod-reader-sa`
+- `Role` / `RoleBinding`：只授權讀取 `probe-lab` 內的 Pods
+- `projected volume`：掛載短效 token、CA 憑證與 namespace 資訊
+- `app.py`：使用 Python 呼叫 Kubernetes API，列出 `probe-lab` 內的 Pod 名稱
 
-## 架構說明
+## 檔案說明
 
-這次的權限設計如下：
+- `app.py`：實際呼叫 Kubernetes API 的 Python 程式
+- `Dockerfile`：將 `app.py` 打包成 image
+- `namespace.yaml`：建立 `sa-lab`
+- `rbac.yaml`：建立 `ServiceAccount`、`Role`、`RoleBinding`
+- `pod-local.yaml`：使用本機 Minikube image 驗證
+- `pod.yaml`：使用公開 Docker Hub image 驗證
 
-- Pod 執行在 `sa-lab`
-- `ServiceAccount` 也建立在 `sa-lab`
-- `Role` 與 `RoleBinding` 建立在 `probe-lab`
-- `RoleBinding` 綁定來自 `sa-lab` 的 `pod-reader-sa`
+## 執行流程與截圖
 
-這個設計可以展示：Pod 雖然在 `sa-lab` 執行，但仍可透過 RBAC 被授權去讀取 `probe-lab` 裡的 Pods。
+### Step 1. 建立 Minikube 叢集
 
-可以把 namespace 想成邏輯邊界，但不要把它完全等同成資料夾。真正負責授權的是 `Role` 與 `RoleBinding`；namespace 主要提供資源隔離與歸屬範圍。
-
-在真實環境中，這很像監控系統放在自己的 namespace，例如 Prometheus 位於 `monitoring`，但被授權去讀取其他 namespace 的工作負載資訊。
-
-## 運作流程
-
-### 第一步：身份與權限的建立 (`rbac.yaml`)
-
-Pod 要能呼叫 Kubernetes API，首先要有合適的身份與權限。
-
-1. `ServiceAccount`：建立 `pod-reader-sa`，它是 Pod 對 API Server 表明身份時使用的憑證來源。
-2. `Role`：在 `probe-lab` namespace 中建立 `pod-reader-role`，授予 `pods` 資源的 `get` 與 `list` 權限。
-3. `RoleBinding`：把來自 `sa-lab` 的 `pod-reader-sa` 綁定到 `probe-lab` 的 `pod-reader-role`，讓這個身份可以讀取 `probe-lab` 內的 Pods。
-
-### 第二步：掛載 Token 與憑證 (`pod.yaml`)
-
-為了讓 Python 程式能安全呼叫 API Server，Pod 需要取得 token 與 CA 憑證。
-
-1. `spec.serviceAccountName: pod-reader-sa`：指定這個 Pod 要使用哪個 ServiceAccount。
-2. `automountServiceAccountToken: false`：關閉預設自動掛載，改用我們自己定義的 projected volume。
-3. `projected` volume：把多個來源的資訊掛到同一個目錄下。
-
-在這份設定裡，projected volume 來源有三個：
-- `serviceAccountToken`：產生短效 token，寫入 `token` 檔案
-- `configMap`：從 `kube-root-ca.crt` 取出 `ca.crt`
-- `downwardAPI`：把 Pod 自己的 namespace 資訊寫入檔案
-
-最後這個 volume 會掛到容器內的 `/var/run/secrets/pod-reader`。
-
-### 第三步：準備 API 呼叫參數 (`app.py`)
-
-程式執行時，需要知道 API Server 在哪裡，以及 token 和 CA 憑證檔案放在哪裡。
-
-1. `build_api_url()` 會讀取 `KUBERNETES_SERVICE_HOST` 與 `KUBERNETES_SERVICE_PORT_HTTPS`。
-2. 這兩個環境變數通常會由 Kubernetes 自動提供給 Pod，讓 Pod 知道 API Server 的內部位址。
-3. 程式會從 `/var/run/secrets/pod-reader/token` 讀 token。
-4. 程式會從 `/var/run/secrets/pod-reader/ca.crt` 讀 CA 憑證。
-
-### 第四步：實際送出請求 (`fetch_pods()`)
-
-1. 組合 API URL：`https://{host}:{port}/api/v1/namespaces/{TARGET_NAMESPACE}/pods`
-2. 在 HTTP Header 中加入 `Authorization: Bearer {token}`
-3. 用 `ssl.create_default_context(cafile=CA_FILE)` 驗證 API Server 憑證
-4. 送出請求後解析 JSON，最後把 Pod 名稱印到 logs
-
-## 操作步驟
-
-### Step 1. 確認環境
+使用固定 network 與 static IP 重建 `task1`，避免 Minikube 在 kubeadm 初始化時出現空白 `advertiseAddress` 與 `certSANs` 問題。
 
 ```powershell
-kubectl config current-context
-minikube status -p task1
-kubectl get nodes
-kubectl get pods -n probe-lab
+minikube start -p task1 --driver=docker --network=minikube-task1-net --static-ip=192.168.58.10
 ```
 
-只要 `task1` 是 Running，且 `probe-lab` 裡面看得到 Pods，就可以往下做。
+![Step 1 - Minikube start success](./01_minikube_start_success.png)
 
-### Step 2. 用 Minikube 建立本機測試 image
+### Step 2. 確認叢集狀態正常
+
+確認節點 `task1` 為 `Ready`，並且目前 `task1` profile 狀態為 `OK`。
 
 ```powershell
-minikube image build -p task1 -t task4-pod-reader:local .\week1\task4
+kubectl get nodes -o wide
+kubectl get ns
+minikube profile list
+```
+
+![Step 2 - Cluster ready checks](./02_cluster_ready_checks.png)
+
+### Step 3. 建立 `sa-lab` 與 `probe-lab`
+
+`sa-lab` 用來執行 `pod-reader`，`probe-lab` 作為被讀取的目標 namespace。
+
+```powershell
+kubectl apply -f .\namespace.yaml
+kubectl apply -f ..\task3\namespace.yaml
+kubectl get ns
+```
+
+![Step 3 - Create namespaces](./03_create_namespaces.png)
+
+### Step 4. 建立 `probe-lab` 內的示範工作負載
+
+建立 `nginx-probe-demo` Deployment、Service 與 `curl-client`，讓 `probe-lab` 內有多個可被查詢的 Pod。
+
+```powershell
+kubectl apply -f ..\task3\deployment.yaml
+kubectl apply -f ..\task3\service.yaml
+kubectl apply -f ..\task3\curl-client.yaml
+```
+
+![Step 4 - Create probe workload](./04_create_probe_workload.png)
+
+### Step 5. 確認 `probe-lab` 內的 Pod 已就緒
+
+這一步是為了確保目標 namespace 真的有 Pod 可讀取。
+
+```powershell
+kubectl wait --for=condition=Available deployment/nginx-probe-demo -n probe-lab --timeout=180s
+kubectl wait --for=condition=Ready pod/curl-client -n probe-lab --timeout=180s
+kubectl get pods -n probe-lab -o wide
+```
+
+![Step 5 - Probe lab pods ready](./05_probe_lab_pods_ready.png)
+
+### Step 6. 建立 ServiceAccount 與 RBAC
+
+在 `sa-lab` 建立 `pod-reader-sa`，並在 `probe-lab` 建立 `Role` / `RoleBinding`，讓 `pod-reader-sa` 具備 `list pods` 權限。
+
+```powershell
+kubectl apply -f .\rbac.yaml
+kubectl get sa -n sa-lab
+kubectl get role -n probe-lab
+kubectl get rolebinding -n probe-lab
+```
+
+![Step 6 - Create RBAC resources](./06_create_rbac_resources.png)
+
+### Step 7. 驗證 RBAC 權限
+
+使用 `kubectl auth can-i` 模擬 `pod-reader-sa`，確認它在 `probe-lab` 中可以列出 Pods。
+
+```powershell
+kubectl auth can-i list pods --as=system:serviceaccount:sa-lab:pod-reader-sa -n probe-lab
+```
+
+結果為 `yes`，表示 RBAC 設定正確。
+
+![Step 7 - Verify RBAC permissions](./07_verify_rbac_permissions.png)
+
+### Step 8. 建立本機測試 image
+
+先用 Minikube 內建 image build 做功能驗證，避免一開始就卡在 Docker Hub push/pull。
+
+```powershell
+minikube image build -p task1 -t task4-pod-reader:local .
 minikube image ls -p task1 | Select-String "task4-pod-reader"
 ```
 
-### Step 3. 建立 namespace 與 RBAC
+![Step 8 - Build local image](./08_build_local_image.png)
+
+### Step 9. 建立 `pod-reader`
+
+使用 `pod-local.yaml` 建立 `pod-reader`，讓 Pod 透過 `projected volume` 掛載 token 與 CA，並以 `pod-reader-sa` 身份執行。
 
 ```powershell
-kubectl apply -f .\week1\task4\namespace.yaml
-kubectl apply -f .\week1\task4\rbac.yaml
-kubectl get sa -n sa-lab
-kubectl get rolebinding -n probe-lab
+kubectl apply -f .\pod-local.yaml
+kubectl get pod pod-reader -n sa-lab -o wide
 ```
-### Step 4. 建立使用 projected token 的 Pod
+
+`pod-reader` 顯示 `Completed` 是正常的，因為 `app.py` 是執行一次後結束，不是常駐服務。
+
+![Step 9 - Deploy pod reader](./09_deploy_pod_reader.png)
+
+### Step 10. 查看 Pod logs
+
+這一步是本題最終驗證。若設定正確，`pod-reader` 會呼叫 Kubernetes API，列出 `probe-lab` 內目前存在的 Pods。
+
 ```powershell
-kubectl apply -f .\week1\task4\pod-local.yaml
 kubectl logs pod-reader -n sa-lab
 ```
 
-預期 logs 會列出 `probe-lab` 內目前的 Pod 名稱。
-建議先用 `kubectl get pod pod-reader -n sa-lab --watch` 觀察 Pod 進入 `Completed`，再查看 logs。
+實際結果：
 
-### Step 5. 推送到 Docker Hub 並使用公開 image 驗證
+```text
+pod list in probe-lab namespace:
+1. curl-client
+2. nginx-probe-demo-b66b58c54-8pgh2
+3. nginx-probe-demo-b66b58c54-vlsfc
+4. nginx-probe-demo-b66b58c54-zpnk7
+```
+
+![Step 10 - Verify pod reader logs](./10_verify_pod_reader_logs.png)
+
+## 公開 Docker Hub image
+
+本題最終也已將 image push 到 public Docker Hub registry：
+
+`wellshuang814/k8s-pod-reader:week1-task4`
+
+使用公開 image 驗證的指令如下：
 
 ```powershell
 docker build -t wellshuang814/k8s-pod-reader:week1-task4 .\week1\task4
@@ -127,6 +182,17 @@ kubectl wait --for=jsonpath='{.status.phase}'=Succeeded pod/pod-reader -n sa-lab
 kubectl logs pod-reader -n sa-lab
 ```
 
-公開 image：
+公開 Docker Hub image 驗證結果：
 
-`wellshuang814/k8s-pod-reader:week1-task4`
+![Step 11 - Verify public Docker Hub image](./11_verify_public_dockerhub_image.png)
+
+## 結論
+
+本題已完成以下要求：
+
+1. 使用 Python 撰寫呼叫 Kubernetes API 的程式
+2. 將程式打包成容器 image
+3. 使用 `ServiceAccount`、`Role`、`RoleBinding` 進行授權
+4. 使用 `projected volume` 掛載短效 token 與 CA 憑證
+5. 成功在 Pod logs 中列出 `probe-lab` 內的 Pod 清單
+6. 成功將 image push 到 public Docker Hub registry
