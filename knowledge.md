@@ -396,3 +396,146 @@ Gateway API 版本：
 5. 最後才卸載 controller
 
 如果先把 controller 卸載掉，再刪還帶 finalizer 的資源，就可能需要手動 patch 才能解卡。
+
+## Task9 Loki
+
+`Loki` 是 log aggregation backend，重點不是全文索引，而是把 log 依 labels 分流、儲存、查詢。
+
+- 可以把它想成專門收 log 的後端
+- collector 把 log push 到 Loki
+- Grafana 再把 Loki 當作 datasource 查詢
+- 這題會用 `LogQL` 在 Loki 裡找 Nginx access log
+
+### Task9 裡 Loki 的重點設定
+
+- `deploymentMode: SingleBinary`
+  適合 Minikube 單節點 lab
+- `loki.commonConfig.replication_factor: 1`
+  單節點不需要多副本複寫
+- `loki.storage.type: filesystem`
+  這題先用檔案系統，不接物件儲存
+- `loki.schemaConfig`
+  定義 Loki index / chunk 使用的 schema。這次使用 `tsdb + v13`
+- `singleBinary.persistence.enabled: true`
+  這次實測如果 `/var/loki` 不可寫，Loki 會因為 `read-only file system` 啟動失敗
+- `chunksCache.enabled: false`、`resultsCache.enabled: false`
+  關掉額外 cache 元件，降低 lab 複雜度
+- `lokiCanary.enabled: false`
+  先不加 canary，避免多出和題目無關的 log source
+
+## Task9 Grafana
+
+`Grafana` 是查詢與視覺化入口，本身不是 log storage。
+
+- Grafana 會連 datasource
+- Grafana 會把 Loki 的 log 顯示在 Explore 或 dashboard
+- 如果 Grafana 壞掉，不代表 Loki 沒收 log
+- 如果 Loki 壞掉，Grafana UI 仍可能能登入，但查 log 會失敗
+
+### Task9 裡 Grafana 的重點設定
+
+- `service.type: ClusterIP`
+  先維持叢集內服務，用 `port-forward` 驗證即可
+- `service.port: 80`
+  對外簡化成 80，內部仍轉到 3000
+- `persistence.enabled: false`
+  這題先不追求 Grafana 本身持久化
+- `datasources.datasources.yaml`
+  啟動時自動 provision Loki datasource
+- `url: http://loki-gateway.task9.svc.cluster.local`
+  Grafana 透過 Service 找 Loki，不直接依賴 Pod IP
+
+## Loki 與 Grafana 的依存關係
+
+這兩者是後端與前端的關係，不是平行獨立。
+
+- `Loki = 存 log、查 log 的後端`
+- `Grafana = 看 log、查 log 的前端`
+- Grafana 依賴 Loki 當 datasource 才能查這題的 logs
+- Loki 不依賴 Grafana 才能收 log
+
+所以排錯時可以這樣想：
+
+- Grafana 登得進去但看不到 log：先檢查 Loki 與 collector
+- Loki 正常但 Grafana 打不開：代表收 log 這段可能沒問題，只是視覺化入口壞掉
+
+## Logging Pipeline 名詞
+
+`logging pipeline` 就是 log 從產生到被查詢的整條路徑。
+
+### Log Producer
+
+產生日誌的應用程式。
+
+- 這題裡是 `nginx`
+- Nginx 收到 request 後把 access log 寫進檔案
+
+### HostPath
+
+把 node 上的真實路徑掛進 Pod。
+
+- 這題把 node 的 `/var/log/task9-nginx` 掛進 Nginx
+- collector 也掛進同一個 hostPath
+- 所以兩個 Pod 看到的是同一份節點檔案
+
+### Log Collector
+
+負責讀 log、加 metadata、送往後端的元件。
+
+- 常見有 `Fluent Bit`、`Fluentd`、`Logstash`
+- 以前 Loki 常配 `Promtail`
+- 這題選 `Fluent Bit`
+
+### DaemonSet
+
+確保每個 node 都有一份 Pod。
+
+- log collector 很常用 DaemonSet
+- 因為每個 node 都可能有應用在本地寫 log
+- 每個 node 都放一個 collector，才能在本地讀檔再往外送
+
+### Stream Labels
+
+Loki 用 labels 區分 log stream。
+
+- 例如 `job=task9-nginx`
+- 查詢時常用 `{job="task9-nginx"}`
+- labels 是 Loki 查詢的核心概念
+
+### Push
+
+collector 主動把 log 傳給 Loki。
+
+- 這題是 `Fluent Bit -> Loki`
+- 目標 API 是 `/loki/api/v1/push`
+
+### Datasource
+
+Grafana 連後端資料系統的設定。
+
+- 這題的 datasource 是 `Loki`
+- datasource 設好後，Grafana Explore 才能查 logs
+
+### Explore
+
+Grafana 裡用來即時查 logs 的介面。
+
+- 這題驗證成功時，應該能在 Explore 查到 `{job="task9-nginx"}` 的結果
+
+## Task9 資料流
+
+1. 使用者打到 Nginx
+2. Nginx 把 access log 寫到 `hostPath`
+3. Fluent Bit DaemonSet 讀取 `hostPath` 裡的 log 檔
+4. Fluent Bit 把 log push 到 Loki
+5. Grafana 透過 Loki datasource 查詢
+6. 你在 Grafana Explore 看到 log
+
+## Task9 為什麼不用 Promtail
+
+Grafana 官方文件說明：
+
+- Promtail 在 2025-02-13 進入 LTS
+- Promtail 在 2026-03-02 進入 EOL
+
+今天是 2026-03-29，所以這次 lab 不再把 Promtail 當首選，改用目前仍維護中的 `Fluent Bit`。

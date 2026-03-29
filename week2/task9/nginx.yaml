@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: task9-nginx
+  namespace: task9
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: task9-nginx
+  template:
+    metadata:
+      labels:
+        app: task9-nginx
+    spec:
+      initContainers:
+        - name: prepare-hostpath
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - mkdir -p /host-logs && touch /host-logs/access.log /host-logs/error.log && chmod 666 /host-logs/access.log /host-logs/error.log
+          volumeMounts:
+            - name: nginx-host-logs
+              mountPath: /host-logs
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+            - name: nginx-host-logs
+              mountPath: /var/log/nginx
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+      volumes:
+        - name: nginx-config
+          configMap:
+            name: task9-nginx-config
+        - name: nginx-host-logs
+          hostPath:
+            path: /var/log/task9-nginx
+            type: DirectoryOrCreate
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: task9-nginx
+  namespace: task9
+spec:
+  selector:
+    app: task9-nginx
+  ports:
+    - port: 80
+      targetPort: 80

@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluent-bit-config
+  namespace: task9
+data:
+  fluent-bit.conf: |
+    [SERVICE]
+        Flush        1
+        Daemon       Off
+        Log_Level    info
+
+    [INPUT]
+        Name              tail
+        Path              /var/log/task9-nginx/*.log
+        Tag               task9.nginx
+        Refresh_Interval  2
+        Read_from_Head    true
+        DB                /fluent-bit/state/task9-nginx.db
+
+    [OUTPUT]
+        Name             loki
+        Match            task9.*
+        Host             loki-gateway.task9.svc.cluster.local
+        Port             80
+        Uri              /loki/api/v1/push
+        Labels           job=task9-nginx,app=nginx,namespace=task9,collector=fluent-bit
+        Line_Format      key_value
