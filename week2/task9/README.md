@@ -181,7 +181,7 @@ Fluent Bit 在這題扮演的是 log collector，負責讀取 `hostPath` 內的 
 ## Cleanup
 
 ```powershell
-kubectl delete namespace task9
-& $helm uninstall loki -n task9
 & $helm uninstall grafana -n task9
+& $helm uninstall loki -n task9
+kubectl delete namespace task9
 ```

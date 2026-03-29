@@ -538,4 +538,4 @@ Grafana 官方文件說明：
 - Promtail 在 2025-02-13 進入 LTS
 - Promtail 在 2026-03-02 進入 EOL
 
-今天是 2026-03-29，所以這次 lab 不再把 Promtail 當首選，改用目前仍維護中的 `Fluent Bit`。
+今天是 2026-03-30，所以這次 lab 不再把 Promtail 當首選，改用目前仍維護中的 `Fluent Bit`。
