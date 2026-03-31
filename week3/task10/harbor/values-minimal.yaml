@@ -1,0 +1,31 @@
+expose:
+  type: clusterIP
+  tls:
+    enabled: false
+
+externalURL: http://127.0.0.1:8081
+
+harborAdminPassword: Harbor12345!
+
+updateStrategy:
+  type: Recreate
+
+trivy:
+  enabled: false
+
+persistence:
+  enabled: true
+  persistentVolumeClaim:
+    registry:
+      storageClass: standard
+      size: 2Gi
+    jobservice:
+      jobLog:
+        storageClass: standard
+        size: 1Gi
+    database:
+      storageClass: standard
+      size: 1Gi
+    redis:
+      storageClass: standard
+      size: 1Gi

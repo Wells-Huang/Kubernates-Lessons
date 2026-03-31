@@ -19,6 +19,7 @@
 - Task6：轉成 GitLab repo 內的 Helm Chart，由 Argo CD 從 Git repo path 部署
 - 第三方 Helm：Bitnami `nginx`
 - App 管理方式：先手動建立，再改成 YAML，最後升級成 App of Apps
+- Harbor 延伸實作：使用 local database / `admin` 帳號部署 Harbor，並把 `task6-platform` Helm Chart push 到 Harbor OCI registry
 
 ## 架構概念
 
@@ -37,6 +38,7 @@ flowchart LR
 - Argo CD 安裝時，CRD 太大會遇到 `metadata.annotations: Too long`，因此要改成 `server-side apply`。
 - 第三方 Helm Chart 一開始用了不存在的 image tag，導致 `Init:ImagePullBackOff`，後來換成可用的 chart 版本後才成功。
 - 第三方 Helm Chart 預設 `service.type=LoadBalancer`，在本機 Minikube 沒有 external load balancer 基礎設施時，`EXTERNAL-IP` 會停在 `<pending>`，Argo CD 可能因此維持 `Progressing`。後來改成 `ClusterIP` 才變成 `Healthy`。
+- Harbor 這段採最小可交版：不接 GitHub / OIDC、不額外接外部 DB，直接用 Harbor 內建 database authentication 與 `admin` 帳號完成部署、登入與 Helm chart push。
 
 ## 流程紀錄
 
@@ -413,6 +415,144 @@ Argo CD 使用官方安裝 manifest。
 
   <img src="./22_root_application_and_app_of_apps_tree.png" alt="22_root_application_and_app_of_apps_tree.png" width="900">
 
+### Step 10. 確認既有 cluster 仍可承接 Harbor
+
+在補做 Harbor 之前，先確認前面已部署的 GitLab、Argo CD、Task6 與第三方 Nginx 都還活著，避免在一個已經故障的 cluster 上繼續追加資源。
+
+代表意義：
+
+- 證明 Harbor 是在既有 lab 成果上追加的延伸實作
+- 確認目前 cluster 仍有可運行的基礎狀態
+
+相關截圖：
+
+- [23_confirm_all_pods_are_alive.png](./23_confirm_all_pods_are_alive.png)
+  代表在開始 Harbor 前，cluster 中前面部署的主要元件都仍維持 `Running`。
+
+  <img src="./23_confirm_all_pods_are_alive.png" alt="23_confirm_all_pods_are_alive.png" width="900">
+
+### Step 11. 準備 Harbor 最小安裝設定並確認 chart repo
+
+這一步先建立 Harbor 的最小 values 檔，配置方向如下：
+
+- `expose.type=clusterIP`
+- `externalURL=http://127.0.0.1:8081`
+- `harborAdminPassword=Harbor12345!`
+- `trivy.enabled=false`
+
+接著加入官方 Harbor Helm repo，確認 chart 可用。
+
+代表意義：
+
+- 先把 Harbor 安裝設定簡化到最適合本機 lab 的版本
+- 確認後續安裝來源是官方 Harbor Helm chart
+
+相關截圖：
+
+- [24_confirm_helm_and_chart.png](./24_confirm_helm_and_chart.png)
+  代表 Harbor 最小設定檔已確認完成，且官方 Harbor Helm repo 與 chart 已可正常查詢。
+
+  <img src="./24_confirm_helm_and_chart.png" alt="24_confirm_helm_and_chart.png" width="900">
+
+### Step 12. 部署 Harbor 到 Kubernetes
+
+使用 `harbor/harbor` chart 搭配最小 values 檔，安裝到 `harbor` namespace。
+
+部署初期先觀察：
+
+- Pod 是否被建立
+- PVC 是否成功 `Bound`
+- Service 是否建立完成
+
+代表意義：
+
+- Harbor 的核心元件已開始進入 cluster
+- 儲存層已準備好，後續 registry 才能保存 chart artifact
+
+相關截圖：
+
+- [25_hobar_pod_pvc_svc_are_created.png](./25_hobar_pod_pvc_svc_are_created.png)
+  代表 Harbor 相關 Pod、PVC 與 Service 都已成功建立。
+  這張圖屬於「資源已建立」證據，說明 Harbor 安裝程序已順利展開，但當下元件還在初始化中。
+
+  <img src="./25_hobar_pod_pvc_svc_are_created.png" alt="25_hobar_pod_pvc_svc_are_created.png" width="900">
+
+### Step 13. 等待 Harbor 元件完全就緒
+
+接著持續檢查 Harbor 各元件狀態，直到：
+
+- `harbor-core`
+- `harbor-portal`
+- `harbor-jobservice`
+- `harbor-nginx`
+- `harbor-registry`
+- `harbor-database`
+- `harbor-redis`
+
+都進入 `Running`。
+
+代表意義：
+
+- Harbor 已經不是只有資源建立完成，而是整個服務真正可用了
+- 後續可以進 UI 登入並推送 Helm chart
+
+相關截圖：
+
+- [26_hobar_is_ready.png](./26_hobar_is_ready.png)
+  代表 Harbor 所需的主要元件都已進入 `Running`，服務已可進入下一步驗證與使用。
+
+  <img src="./26_hobar_is_ready.png" alt="26_hobar_is_ready.png" width="900">
+
+### Step 14. 以 local admin 帳號登入 Harbor 並建立 project
+
+Harbor 透過 `kubectl port-forward svc/harbor -n harbor 8081:80` 暴露到本機，然後使用：
+
+- Username: `admin`
+- Password: `Harbor12345!`
+
+登入 Harbor UI，並建立 `helm` project。
+
+代表意義：
+
+- 已確認 Harbor 的 local database / admin 登入方式可用
+- 已建立後續存放 Helm chart 的 project
+
+相關截圖：
+
+- [27_Harbor_project_created.png](./27_Harbor_project_created.png)
+  代表 Harbor 已可成功登入，且 `helm` project 已建立完成。
+
+  <img src="./27_Harbor_project_created.png" alt="27_Harbor_project_created.png" width="900">
+
+### Step 15. 打包 `task6-platform` 並 push 到 Harbor OCI registry
+
+先對 `task6-platform` chart 執行 `helm package`，產出：
+
+- `task6-platform-0.1.0.tgz`
+
+接著使用：
+
+- `helm registry login 127.0.0.1:8081 --username admin --password ... --plain-http`
+- `helm push ... oci://127.0.0.1:8081/helm --plain-http`
+
+把 chart 推進 Harbor。
+
+代表意義：
+
+- 題目中「如果是 Helm，可嘗試將 Chart 推到 Harbor 上」已實際完成
+- Harbor 已成功作為 OCI Helm chart registry 使用
+
+相關截圖：
+
+- [28_helm_push_is_success.png](./28_helm_push_is_success.png)
+  代表 `task6-platform` 已成功完成 package、登入 Harbor registry，並 push 到 `oci://127.0.0.1:8081/helm`。
+
+  <img src="./28_helm_push_is_success.png" alt="28_helm_push_is_success.png" width="900">
+- [29_check_helm_push_in_HelmUI.png](./29_check_helm_push_in_HelmUI.png)
+  代表 Harbor UI 中已能看到 `task6-platform` artifact 與 `0.1.0` 版本，完成最終驗證。
+
+  <img src="./29_check_helm_push_in_HelmUI.png" alt="29_check_helm_push_in_HelmUI.png" width="900">
+
 ## 問題與修正摘要
 
 ### 1. GitLab 的 Minikube IP 無法直接從 Windows 瀏覽器打開
@@ -493,6 +633,31 @@ Argo CD 使用官方安裝 manifest。
 
 - 覆寫 `service.type=ClusterIP`
 
+### 8. Harbor 補做採 local database / admin，而非 GitHub 登入
+
+原因：
+
+- 本次目標是最小可交版 Harbor 實作
+- 直接使用 Harbor 內建 database authentication 與 `admin` 帳號即可完成部署與 chart push
+- 若改接 GitHub 身分，通常還需要額外的 OIDC provider 或橋接設定，不適合本次最小路線
+
+解法：
+
+- 採用 Harbor 預設本地帳號模式
+- 透過 `admin` 登入 UI 後建立 `helm` project
+
+### 9. Harbor 使用 `ClusterIP + port-forward` 取代額外暴露方式
+
+原因：
+
+- 本次只需要最小驗證 Harbor UI 與 registry 可用
+- 直接用 `ClusterIP` 搭配 `kubectl port-forward` 即可完成，不必再加 Ingress / NodePort
+
+解法：
+
+- `expose.type=clusterIP`
+- 使用 `kubectl port-forward svc/harbor -n harbor 8081:80`
+
 ## 截圖索引
 
 | 編號 | 檔名 | 在流程中的代表意義 |
@@ -519,6 +684,13 @@ Argo CD 使用官方安裝 manifest。
 | 20 | `20_application_yaml_git_push.png` | 兩個 Application YAML 已推回 GitLab |
 | 21 | `21_argocd_applications_managed_by_yaml.png` | 兩個 Applications 已由 YAML 管理 |
 | 22 | `22_root_application_and_app_of_apps_tree.png` | App of Apps root Application 已建立完成 |
+| 23 | `23_confirm_all_pods_are_alive.png` | 補做 Harbor 前，原有 cluster 主要元件仍正常運作 |
+| 24 | `24_confirm_helm_and_chart.png` | Harbor 最小 values 與官方 chart repo 已確認 |
+| 25 | `25_hobar_pod_pvc_svc_are_created.png` | Harbor Pod、PVC、Service 已建立 |
+| 26 | `26_hobar_is_ready.png` | Harbor 主要元件已全部就緒 |
+| 27 | `27_Harbor_project_created.png` | Harbor 已可登入，且 `helm` project 已建立 |
+| 28 | `28_helm_push_is_success.png` | Helm chart 已成功 push 到 Harbor OCI registry |
+| 29 | `29_check_helm_push_in_HelmUI.png` | Harbor UI 中已能看到 `task6-platform:0.1.0` artifact |
 
 ## Cleanup
 
@@ -527,4 +699,5 @@ kubectl delete namespace argocd --wait=false
 kubectl delete namespace gitlab --wait=false
 kubectl delete namespace week3-task10 --wait=false
 kubectl delete namespace third-party-demo --wait=false
+kubectl delete namespace harbor --wait=false
 ```
