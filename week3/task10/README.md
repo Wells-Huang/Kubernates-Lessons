@@ -108,6 +108,7 @@ GitLab 使用：
   <img src="./03_gitlab_resources_ready.png" alt="03_gitlab_resources_ready.png" width="900">
 - [04_gitlab_sign_in.png](./04_gitlab_sign_in.png)
   代表 GitLab Web UI 已可登入，說明 GitLab 服務已經可用。
+  這一步同時代表前面直接使用 `minikube ip` 無法從 Windows 瀏覽器連線的問題，已經透過 `kubectl port-forward` 成功繞過。
 
   <img src="./04_gitlab_sign_in.png" alt="04_gitlab_sign_in.png" width="900">
 
@@ -129,6 +130,7 @@ GitLab 使用：
 
 - [05_gitops_repo_push_success.png](./05_gitops_repo_push_success.png)
   代表本地 GitOps repo 已成功 push 到 GitLab。
+  這一步中間曾處理 Windows Git 的 `safe.directory` 檢查，以及 GitLab 專案預設 `README` commit 造成的歷史合併問題，最後才完成 push。
 
   <img src="./05_gitops_repo_push_success.png" alt="05_gitops_repo_push_success.png" width="900">
 - [06_gitlab_repo_contents.png](./06_gitlab_repo_contents.png)
@@ -186,6 +188,7 @@ Argo CD 使用官方安裝 manifest。
 
 - [08_argocd_components_ready.png](./08_argocd_components_ready.png)
   代表 Argo CD 各元件已經安裝完成並處於可用狀態。
+  這一步也代表安裝過程中遇到的 CRD annotation 過大問題，已經透過 `kubectl apply --server-side` 修正完成。
 
   <img src="./08_argocd_components_ready.png" alt="08_argocd_components_ready.png" width="900">
 - [09_argocd_login.png](./09_argocd_login.png)
@@ -219,6 +222,7 @@ Argo CD 使用官方安裝 manifest。
 
 - [10_task6_application_sync_policy.png](./10_task6_application_sync_policy.png)
   代表 `task6-platform` Application 的自動同步、Prune、Self Heal 與 Auto-Create Namespace 等設定已配置完成。
+  也就是說，這個 Application 已經從單純的手動同步，提升成 GitOps 自動收斂模式。
 
   <img src="./10_task6_application_sync_policy.png" alt="10_task6_application_sync_policy.png" width="900">
 - [11_task6_application_synced.png](./11_task6_application_synced.png)
@@ -272,10 +276,12 @@ Argo CD 使用官方安裝 manifest。
 
 - [15_third_party_image_pull_backoff.png](./15_third_party_image_pull_backoff.png)
   代表第三方 Nginx Pod 發生 `Init:ErrImagePull / ImagePullBackOff`。
+  這張圖屬於「症狀圖」，表示部署表面上已建立資源，但工作負載實際上還無法成功啟動。
 
   <img src="./15_third_party_image_pull_backoff.png" alt="15_third_party_image_pull_backoff.png" width="900">
 - [16_third_party_manifest_unknown.png](./16_third_party_manifest_unknown.png)
   代表 `kubectl describe pod` 已定位到真正原因：指定的 image manifest 不存在。
+  這張圖屬於「根因圖」，說明問題不是 Argo CD 本身，而是 chart 對應的 image tag 已失效。
 
   <img src="./16_third_party_manifest_unknown.png" alt="16_third_party_manifest_unknown.png" width="900">
 
@@ -369,6 +375,7 @@ Argo CD 使用官方安裝 manifest。
 
 - [20_application_yaml_git_push.png](./20_application_yaml_git_push.png)
   代表 Application YAML 的更新已經 commit 並 push 回 GitLab。
+  這一步的意義是把原本在 UI 手動建立的兩個 Applications，正式回寫成 Git 中可追蹤的宣告式設定。
 
   <img src="./20_application_yaml_git_push.png" alt="20_application_yaml_git_push.png" width="900">
 - [21_argocd_applications_managed_by_yaml.png](./21_argocd_applications_managed_by_yaml.png)
@@ -402,6 +409,7 @@ Argo CD 使用官方安裝 manifest。
 
 - [22_root_application_and_app_of_apps_tree.png](./22_root_application_and_app_of_apps_tree.png)
   代表 root Application 已建立成功，並可在 Argo CD tree 中看到 App of Apps 的管理關係。
+  也就是說，`task10-root` 已經指向 `apps/` 目錄，開始統一管理 `task6-platform` 與 `third-party-nginx` 兩個 child applications。
 
   <img src="./22_root_application_and_app_of_apps_tree.png" alt="22_root_application_and_app_of_apps_tree.png" width="900">
 
