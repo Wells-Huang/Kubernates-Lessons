@@ -54,6 +54,8 @@ flowchart LR
 - [01_clean_cluster_baseline.png](./01_clean_cluster_baseline.png)
   代表 Minikube 重設後的基線狀態已確認完成。
 
+  <img src="./01_clean_cluster_baseline.png" alt="01_clean_cluster_baseline.png" width="900">
+
 ### Step 1. 確認 Minikube IP、Helm 路徑與 GitLab 存取策略
 
 先確認：
@@ -73,6 +75,8 @@ flowchart LR
 
 - [02_minikube_ip_helm_gitlab_url.png](./02_minikube_ip_helm_gitlab_url.png)
   代表已確認 `minikube ip`、Helm 路徑，以及 GitLab 連線策略。
+
+  <img src="./02_minikube_ip_helm_gitlab_url.png" alt="02_minikube_ip_helm_gitlab_url.png" width="900">
 
 ### Step 2. 部署 GitLab 到 Kubernetes
 
@@ -100,8 +104,12 @@ GitLab 使用：
 
 - [03_gitlab_resources_ready.png](./03_gitlab_resources_ready.png)
   代表 GitLab 相關 Kubernetes 資源已建立完成，包含 Service 與 PVC。
+
+  <img src="./03_gitlab_resources_ready.png" alt="03_gitlab_resources_ready.png" width="900">
 - [04_gitlab_sign_in.png](./04_gitlab_sign_in.png)
   代表 GitLab Web UI 已可登入，說明 GitLab 服務已經可用。
+
+  <img src="./04_gitlab_sign_in.png" alt="04_gitlab_sign_in.png" width="900">
 
 ### Step 3. 建立 GitLab project 並 push GitOps repo
 
@@ -121,8 +129,12 @@ GitLab 使用：
 
 - [05_gitops_repo_push_success.png](./05_gitops_repo_push_success.png)
   代表本地 GitOps repo 已成功 push 到 GitLab。
+
+  <img src="./05_gitops_repo_push_success.png" alt="05_gitops_repo_push_success.png" width="900">
 - [06_gitlab_repo_contents.png](./06_gitlab_repo_contents.png)
   代表 GitLab project 內已經可以看到 `charts/`、`apps/`、`bootstrap/` 等內容。
+
+  <img src="./06_gitlab_repo_contents.png" alt="06_gitlab_repo_contents.png" width="900">
 
 ### Step 4. 驗證 Task6 Helm Chart 並 build web image
 
@@ -143,6 +155,8 @@ GitLab 使用：
 
 - [07_task6_chart_lint_and_image_build.png](./07_task6_chart_lint_and_image_build.png)
   代表 Task6 Helm Chart 驗證成功，且 `task6-web:local` image 已 build 完成。
+
+  <img src="./07_task6_chart_lint_and_image_build.png" alt="07_task6_chart_lint_and_image_build.png" width="900">
 
 ### Step 5. 安裝並登入 Argo CD
 
@@ -172,8 +186,12 @@ Argo CD 使用官方安裝 manifest。
 
 - [08_argocd_components_ready.png](./08_argocd_components_ready.png)
   代表 Argo CD 各元件已經安裝完成並處於可用狀態。
+
+  <img src="./08_argocd_components_ready.png" alt="08_argocd_components_ready.png" width="900">
 - [09_argocd_login.png](./09_argocd_login.png)
   代表已成功登入 Argo CD UI。
+
+  <img src="./09_argocd_login.png" alt="09_argocd_login.png" width="900">
 
 ### Step 6. 手動建立 `task6-platform` Application
 
@@ -201,12 +219,20 @@ Argo CD 使用官方安裝 manifest。
 
 - [10_task6_application_sync_policy.png](./10_task6_application_sync_policy.png)
   代表 `task6-platform` Application 的自動同步、Prune、Self Heal 與 Auto-Create Namespace 等設定已配置完成。
+
+  <img src="./10_task6_application_sync_policy.png" alt="10_task6_application_sync_policy.png" width="900">
 - [11_task6_application_synced.png](./11_task6_application_synced.png)
   代表 `task6-platform` Application 已在 Argo CD 中同步成功。
+
+  <img src="./11_task6_application_synced.png" alt="11_task6_application_synced.png" width="900">
 - [12_task6_workloads_running.png](./12_task6_workloads_running.png)
   代表 `week3-task10` namespace 內的 Deployment、StatefulSet、Service 等工作負載已成功建立並運作。
+
+  <img src="./12_task6_workloads_running.png" alt="12_task6_workloads_running.png" width="900">
 - [13_task6_pvc_bound.png](./13_task6_pvc_bound.png)
   代表 Redis StatefulSet 所需的 PVC 已成功建立並綁定。
+
+  <img src="./13_task6_pvc_bound.png" alt="13_task6_pvc_bound.png" width="900">
 
 ### Step 7. 手動建立第三方 Helm Chart Application
 
@@ -228,6 +254,8 @@ Argo CD 使用官方安裝 manifest。
 - [14_third_party_application_created.png](./14_third_party_application_created.png)
   代表第三方 Helm Application 已在 Argo CD 中建立完成。
 
+  <img src="./14_third_party_application_created.png" alt="14_third_party_application_created.png" width="900">
+
 #### 7-2. 舊 chart 版本導致 image pull 失敗
 
 一開始使用的 chart 版本太舊，對應 image tag 已不存在，因此發生：
@@ -244,8 +272,12 @@ Argo CD 使用官方安裝 manifest。
 
 - [15_third_party_image_pull_backoff.png](./15_third_party_image_pull_backoff.png)
   代表第三方 Nginx Pod 發生 `Init:ErrImagePull / ImagePullBackOff`。
+
+  <img src="./15_third_party_image_pull_backoff.png" alt="15_third_party_image_pull_backoff.png" width="900">
 - [16_third_party_manifest_unknown.png](./16_third_party_manifest_unknown.png)
   代表 `kubectl describe pod` 已定位到真正原因：指定的 image manifest 不存在。
+
+  <img src="./16_third_party_manifest_unknown.png" alt="16_third_party_manifest_unknown.png" width="900">
 
 #### 7-3. 查詢可用 chart 版本並升級
 
@@ -261,6 +293,8 @@ Argo CD 使用官方安裝 manifest。
 
 - [17_bitnami_nginx_versions.png](./17_bitnami_nginx_versions.png)
   代表已查詢 Helm repo 中目前可用的 `bitnami/nginx` 版本。
+
+  <img src="./17_bitnami_nginx_versions.png" alt="17_bitnami_nginx_versions.png" width="900">
 
 #### 7-4. `LoadBalancer` 造成 Application 維持 `Progressing`
 
@@ -286,6 +320,8 @@ Argo CD 使用官方安裝 manifest。
 - [18_third_party_loadbalancer_progressing.png](./18_third_party_loadbalancer_progressing.png)
   代表 chart 版本修正後，Pod 已可運作，但因 `LoadBalancer` 的 `EXTERNAL-IP` 仍是 `<pending>`，Application 在 Argo CD 中仍顯示 `Progressing`。
 
+  <img src="./18_third_party_loadbalancer_progressing.png" alt="18_third_party_loadbalancer_progressing.png" width="900">
+
 #### 7-5. 把 `service.type` 改成 `ClusterIP`
 
 最終把 Helm 參數改成：
@@ -303,6 +339,8 @@ Argo CD 使用官方安裝 manifest。
 
 - [19_third_party_clusterip_healthy.png](./19_third_party_clusterip_healthy.png)
   代表把 `service.type` 改為 `ClusterIP` 之後，第三方 Nginx Application 已變成 `Healthy`。
+
+  <img src="./19_third_party_clusterip_healthy.png" alt="19_third_party_clusterip_healthy.png" width="900">
 
 ### Step 8. 把兩個 Applications 改成 YAML 管理
 
@@ -331,8 +369,12 @@ Argo CD 使用官方安裝 manifest。
 
 - [20_application_yaml_git_push.png](./20_application_yaml_git_push.png)
   代表 Application YAML 的更新已經 commit 並 push 回 GitLab。
+
+  <img src="./20_application_yaml_git_push.png" alt="20_application_yaml_git_push.png" width="900">
 - [21_argocd_applications_managed_by_yaml.png](./21_argocd_applications_managed_by_yaml.png)
   代表兩個 Applications 已經由 YAML 形式存在於 `argocd` namespace，且狀態為 `Synced / Healthy`。
+
+  <img src="./21_argocd_applications_managed_by_yaml.png" alt="21_argocd_applications_managed_by_yaml.png" width="900">
 
 ### Step 9. 建立 `task10-root`，完成 App of Apps
 
@@ -360,6 +402,8 @@ Argo CD 使用官方安裝 manifest。
 
 - [22_root_application_and_app_of_apps_tree.png](./22_root_application_and_app_of_apps_tree.png)
   代表 root Application 已建立成功，並可在 Argo CD tree 中看到 App of Apps 的管理關係。
+
+  <img src="./22_root_application_and_app_of_apps_tree.png" alt="22_root_application_and_app_of_apps_tree.png" width="900">
 
 ## 問題與修正摘要
 
