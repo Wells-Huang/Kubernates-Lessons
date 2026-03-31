@@ -1,0 +1,25 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: third-party-nginx
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://charts.bitnami.com/bitnami
+    chart: nginx
+    targetRevision: 22.6.10
+    helm:
+      releaseName: third-party-nginx
+      parameters:
+        - name: service.type
+          value: ClusterIP
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: third-party-demo
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

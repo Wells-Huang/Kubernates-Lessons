@@ -1,5 +1,263 @@
 # Kubernetes Learning Notes
 
+## Argo CD 與 GitOps
+
+### Argo CD 是什麼
+
+`Argo CD` 是一個跑在 Kubernetes 內的 `GitOps CD controller`。
+它的核心想法不是「人手動把 YAML 套進 cluster」，而是：
+
+- 先把想要的目標狀態放進 Git
+- 讓 Git 成為單一事實來源
+- 由 Argo CD 持續比對 Git 與 cluster 的差異
+- 差異出現時，再由 Argo CD 去同步
+
+所以 Argo CD 的重點不是單純「部署工具」，而是：
+
+- 宣告式部署
+- 版本可追蹤
+- 狀態可比對
+- 漂移可自動修正
+
+### 你附圖在表達什麼
+
+你附的圖其實是在講一個很典型的 GitOps 分工：
+
+1. 開發者把應用程式原始碼推到 `Source Code Repo`
+2. `CI Pipeline` 讀原始碼，建出映像檔，推到 `Images Registry`
+3. 同時，部署設定放在另一個 `Deployment Repo`，裡面通常是 Helm、Kustomize、YAML
+4. CI 或開發者會更新 Deployment Repo，例如把 image tag 改成新版本
+5. `Argo CD` 持續監看 Deployment Repo
+6. 一旦 Git 內的目標狀態改變，Argo CD 就把變更同步到 Kubernetes
+7. 如果 cluster 內資源被手動改壞，Argo CD 也能偵測 drift，重新拉回 Git 裡定義的狀態
+
+這張圖最重要的概念有兩個：
+
+- `Source Repo` 和 `Deployment Repo` 可以分開
+- 真正驅動部署的是 Git 中的宣告，而不是人直接在 cluster 上手改
+
+### Argo CD GitOps 流程 Mermaid
+
+```mermaid
+flowchart LR
+    Dev["Developer"] --> AppRepo["Source Code Repo"]
+    AppRepo --> CI["CI Pipeline"]
+    CI --> Registry["Image Registry"]
+
+    Dev --> GitOpsRepo["Deployment Repo<br/>Helm / Kustomize / YAML"]
+    CI -->|Update image tag / chart values| GitOpsRepo
+
+    GitOpsRepo -->|Poll or Webhook| ArgoCD["Argo CD"]
+    ArgoCD -->|Sync desired state| Cluster["Kubernetes Cluster"]
+    Cluster -->|Live state / health| ArgoCD
+    ArgoCD -->|Sync status / drift result| Dev
+```
+
+### 為什麼會有兩個 Repo
+
+實務上常把 repo 分成兩種：
+
+- `Application repo`
+  - 放原始碼
+  - 放 Dockerfile
+  - 放 CI 設定
+- `GitOps repo`
+  - 放 Helm chart
+  - 放 values
+  - 放 Kustomize overlay
+  - 放 Argo CD `Application` YAML
+
+這樣做的好處是：
+
+- 原始碼變更和部署變更分開管理
+- 可以清楚知道「哪次部署」到底改了什麼
+- 維運與開發責任較容易切分
+- 比較容易做審核與回滾
+
+### Argo CD 在系統裡通常扮演什麼角色
+
+Argo CD 不是拿來 build image 的，也不是拿來跑測試的。
+它主要負責：
+
+- 從 Git 讀取宣告式設定
+- 解析 Helm / Kustomize / plain YAML
+- 比對 cluster 現況與 Git 目標狀態
+- 執行同步
+- 呈現 `Sync` 與 `Health` 狀態
+- 在啟用 `selfHeal` 時修正 drift
+- 在啟用 `prune` 時刪掉 Git 已移除的舊資源
+
+所以整體責任切分通常是：
+
+- `CI` 負責 build、test、push image
+- `Argo CD` 負責 deploy、sync、reconcile
+
+### Argo CD 常見元件
+
+- `argocd-server`
+  - 提供 Web UI 與 API
+- `argocd-repo-server`
+  - 負責讀 Git repo、render Helm / Kustomize
+- `argocd-application-controller`
+  - 負責比對 desired state 與 live state，並執行 sync
+- `Application`
+  - Argo CD 管理單一部署目標的主要 CR
+- `Project`
+  - 用來限制 repo、namespace、cluster 等邊界
+
+### Application 在實務上怎麼用
+
+`Application` 可以理解成「一個部署單位」。
+一個 Application 會描述：
+
+- Repo 在哪裡
+- 要抓哪個 branch / revision
+- 要用哪個 path、chart、或 kustomization
+- 要部署到哪個 cluster
+- 要部署到哪個 namespace
+- 要不要自動同步
+
+例如：
+
+- 一個 team 的 web service 是一個 Application
+- 一個第三方 Helm chart 也是一個 Application
+- 一個觀測系統 stack 也可以是一個 Application
+
+### Argo CD 與 Helm 的關係
+
+Argo CD 本身不是 Helm registry，也不是 Helm package manager。
+它比較像：
+
+- 讀取 Helm chart
+- 代你 render 成 Kubernetes manifests
+- 再把結果套用到 cluster
+
+所以 Helm 在 Argo CD 裡常見的來源有兩種：
+
+1. `Git repo 裡的 chart path`
+2. `外部 Helm repo / OCI registry`
+
+這也是你這題 Task10 會同時練到的兩條路：
+
+- `Task6` 用 GitLab repo 內的 chart path
+- 第三方服務用公開 Helm repo
+
+### Argo CD 與 Kustomize 的關係
+
+Kustomize 和 Helm 一樣，都是 Argo CD 支援的宣告來源。
+差別大致上是：
+
+- `Helm`
+  - 擅長參數化
+  - 適合做 reusable chart
+- `Kustomize`
+  - 擅長 overlay
+  - 適合同一套 base 對不同環境做差異化
+
+如果你只有少量環境差異，Kustomize 常很直覺。
+如果你要做較多參數化、或要對外重複發佈，Helm 會比較合適。
+
+### Sync、Prune、Self Heal 是什麼
+
+- `Sync`
+  - 把 Git 中的目標狀態套進 cluster
+- `Prune`
+  - 如果某個資源已經從 Git 移除，Argo CD 同步時也把 cluster 內的舊資源刪掉
+- `Self Heal`
+  - 如果有人手動改動 cluster 內資源，Argo CD 會把它修回 Git 中定義的樣子
+
+這三個功能合起來，才是 GitOps 真正穩定的原因。
+
+### Drift 是什麼
+
+`Drift` 指的是：
+
+- Git 裡定義的期望狀態
+- 和 cluster 裡實際狀態
+
+兩者不一致。
+
+例如：
+
+- Git 裡 replicas 是 `2`
+- 但有人手動 `kubectl scale` 成 `5`
+
+這時 Argo CD 會顯示 `OutOfSync`。
+若啟用 `selfHeal`，它會把 replicas 拉回 `2`。
+
+### 實務上常見工作流
+
+最常見的工作流通常是：
+
+1. 開發者修改 app code
+2. CI 測試並建 image
+3. CI 把 image push 到 registry
+4. CI 或開發者更新 GitOps repo 內的 image tag / values
+5. Argo CD 偵測到 GitOps repo 變更
+6. Argo CD 同步到 cluster
+7. 團隊在 UI 上檢查 `Sync` 與 `Health`
+
+若要回滾，通常不是直接去 cluster 改，而是：
+
+- 回滾 Git commit
+- 或把 chart / values 改回舊版
+- 再交給 Argo CD 重同步
+
+### 實務上為什麼喜歡用 Argo CD
+
+- 所有部署變更都有 Git 歷史
+- 發生問題時容易比對是 image 變了，還是 values 變了
+- 避免人工在 cluster 上熱修後沒人知道
+- 可以把部署流程標準化
+- UI 對教學和排錯很直觀
+
+### 實務上要注意的地方
+
+- 不要把敏感資訊直接明文放進 Git
+  - 應搭配 External Secrets、Sealed Secrets、Vault 等方式
+- private repo 需要憑證或 token
+- Helm chart 與 image tag 要有版本策略
+- `prune` 很方便，但也要小心誤刪
+- 多團隊環境要配合 `Project` 做邊界控管
+
+### App of Apps 是什麼
+
+`App of Apps` 是指：
+
+- 用一個根 `Application`
+- 去管理其他子 `Application`
+
+它的好處是：
+
+- 可以把整個 cluster 的基礎元件收斂成一個入口
+- 新環境 bootstrap 很快
+- Application 本身也能 GitOps 化
+
+在你這題裡，做法就是：
+
+- 先有 `task6-platform` 和 `third-party-nginx` 兩個 Application
+- 再做一個 `task10-root`
+- 讓 `task10-root` 去指向存放 `apps/` 的 Git 路徑
+
+### Task10 這題對應到 Argo CD 的哪裡
+
+這題其實把 Argo CD 的核心場景都串起來了：
+
+1. 你先在 GitLab 建一個 GitOps repo
+2. 把 `Task6` 的 Helm chart push 上去
+3. Argo CD 先手動建立一個指向 GitLab chart path 的 Application
+4. 再手動建立一個指向公開 Helm repo 的第三方 Application
+5. 最後把這兩個 Application 也改成 YAML 放回 Git
+6. 再進一步用 App of Apps 管理它們
+
+這是一條很完整的 GitOps 練習路線，因為它同時包含：
+
+- Git repo 當 source of truth
+- Helm chart 部署
+- 第三方 Helm chart 部署
+- Application CR 管理
+- App of Apps bootstrap
+
 ## Finalizer
 
 `finalizer` 可以把它想成 Kubernetes 資源刪除前的清場註記。

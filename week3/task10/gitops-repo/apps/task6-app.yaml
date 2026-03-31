@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: task6-platform
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: http://host.minikube.internal:18080/root/task10-gitops.git
+    targetRevision: main
+    path: charts/task6-platform
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: week3-task10
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

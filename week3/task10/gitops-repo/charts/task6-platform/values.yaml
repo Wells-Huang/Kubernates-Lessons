@@ -1,0 +1,34 @@
+nameOverride: ""
+fullnameOverride: ""
+
+web:
+  replicaCount: 2
+  image:
+    repository: task6-web
+    tag: local
+    pullPolicy: IfNotPresent
+  service:
+    port: 80
+    targetPort: 8080
+
+nginx:
+  replicaCount: 2
+  image:
+    repository: nginx
+    tag: 1.27-alpine
+    pullPolicy: IfNotPresent
+  service:
+    port: 80
+
+redis:
+  replicaCount: 2
+  image:
+    repository: redis
+    tag: 7.4-alpine
+    pullPolicy: IfNotPresent
+  auth:
+    username: default
+    password: task6-redis-pass
+    hostPodOrdinal: 0
+  persistence:
+    size: 1Gi

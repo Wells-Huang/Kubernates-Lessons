@@ -1,0 +1,6 @@
+apiVersion: v2
+name: task6-platform
+description: Helm chart version of week2 task6 for ArgoCD
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
