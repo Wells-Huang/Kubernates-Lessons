@@ -1,0 +1,5 @@
+syncSecret:
+  enabled: true
+
+enableSecretRotation: true
+rotationPollInterval: "15s"

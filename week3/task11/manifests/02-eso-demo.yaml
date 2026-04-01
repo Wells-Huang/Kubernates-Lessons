@@ -1,0 +1,74 @@
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: eso-demo
+  namespace: week3-task11
+spec:
+  refreshPolicy: Periodic
+  refreshInterval: 15s
+  secretStoreRef:
+    kind: SecretStore
+    name: vault-backend
+  target:
+    name: eso-demo-secret
+    creationPolicy: Owner
+  data:
+    - secretKey: username
+      remoteRef:
+        key: week3-task11/eso
+        property: username
+    - secretKey: password
+      remoteRef:
+        key: week3-task11/eso
+        property: password
+    - secretKey: message
+      remoteRef:
+        key: week3-task11/eso
+        property: message
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eso-demo
+  namespace: week3-task11
+  annotations:
+    reloader.stakater.com/auto: "true"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: eso-demo
+  template:
+    metadata:
+      labels:
+        app: eso-demo
+    spec:
+      containers:
+        - name: app
+          image: busybox:1.36
+          command:
+            - /bin/sh
+            - -c
+          args:
+            - |
+              echo "ESO demo started";
+              echo "username=$APP_USERNAME";
+              echo "message=$APP_MESSAGE";
+              while true; do
+                echo "---";
+                date;
+                echo "env username=$APP_USERNAME";
+                echo "env message=$APP_MESSAGE";
+                sleep 20;
+              done
+          env:
+            - name: APP_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: eso-demo-secret
+                  key: username
+            - name: APP_MESSAGE
+              valueFrom:
+                secretKeyRef:
+                  name: eso-demo-secret
+                  key: message

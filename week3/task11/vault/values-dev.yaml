@@ -1,0 +1,17 @@
+server:
+  dev:
+    enabled: true
+    devRootToken: root
+  standalone:
+    enabled: false
+  dataStorage:
+    enabled: false
+
+injector:
+  enabled: false
+
+ui:
+  enabled: true
+
+csi:
+  enabled: true
