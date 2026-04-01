@@ -47,67 +47,70 @@ flowchart LR
 
 ## Vault 架構圖
 
+### 共同元件總覽
+
 ```mermaid
 flowchart LR
-    subgraph K8s["Minikube / Kubernetes"]
-        subgraph ControlPlane["控制面與控制器"]
-            ESO["External Secrets Operator"]
-            Reloader["Reloader"]
-            CSIDriver["Secrets Store CSI Driver"]
-            VaultProvider["Vault CSI Provider"]
-        end
+    Vault["Vault<br/>Secret Provider"]
+    ESO["External Secrets Operator"]
+    CSI["Secrets Store CSI Driver"]
+    VProvider["Vault CSI Provider"]
+    Reloader["Reloader"]
 
-        subgraph APIObjects["本題用到的 K8s 物件 / 介面"]
-            SecretStore["SecretStore"]
-            ExternalSecret["ExternalSecret"]
-            K8sSecret1["eso-demo-secret"]
-            SPC["SecretProviderClass"]
-            K8sSecret2["csi-demo-secret"]
-            SA["ServiceAccount csi-demo-sa"]
-        end
+    Vault --> ESO
+    Vault --> VProvider
+    VProvider --> CSI
+    ESO --> Reloader
+    CSI --> Reloader
+```
 
-        subgraph Workloads["工作負載"]
-            ESOPod["eso-demo Pod"]
-            CSIPod["csi-demo Pod"]
-            Mount["/mnt/secrets-store/*"]
-        end
+### ESO 路線
 
-        subgraph VaultNS["vault namespace"]
-            VaultSvc["vault Service"]
-            VaultServer["vault-0"]
-        end
-    end
+```mermaid
+flowchart LR
+    Vault["Vault"]
+    Store["SecretStore"]
+    ES["ExternalSecret"]
+    Secret["eso-demo-secret"]
+    Pod["eso-demo Pod"]
 
-    SecretStore --> ESO
-    ExternalSecret --> ESO
-    ESO -->|讀取 Vault secret| VaultSvc
-    ESO -->|同步| K8sSecret1
-    K8sSecret1 -->|secretKeyRef / env| ESOPod
+    Store --> ES
+    Vault --> ES
+    ES -->|sync| Secret
+    Secret -->|env / secretKeyRef| Pod
+```
 
-    SA -->|JWT / Kubernetes auth| VaultProvider
-    SPC --> CSIDriver
-    CSIDriver --> VaultProvider
-    VaultProvider -->|讀取 Vault secret| VaultSvc
-    CSIDriver -->|同步| K8sSecret2
-    CSIDriver -->|掛載| Mount
-    K8sSecret2 -->|secretKeyRef / env| CSIPod
-    Mount --> CSIPod
+### CSI 路線
 
-    K8sSecret1 --> Reloader
-    K8sSecret2 --> Reloader
-    Reloader -->|rollout restart| ESOPod
-    Reloader -->|rollout restart| CSIPod
-    VaultSvc --> VaultServer
+```mermaid
+flowchart LR
+    Vault["Vault"]
+    SA["csi-demo-sa"]
+    SPC["SecretProviderClass"]
+    Driver["Secrets Store CSI Driver"]
+    Provider["Vault CSI Provider"]
+    Mount["/mnt/secrets-store/*"]
+    Secret["csi-demo-secret"]
+    Pod["csi-demo Pod"]
+
+    SA -->|Kubernetes auth| Provider
+    SPC --> Driver
+    Driver --> Provider
+    Vault --> Provider
+    Driver -->|mount| Mount
+    Driver -->|sync| Secret
+    Mount --> Pod
+    Secret -->|env / secretKeyRef| Pod
 ```
 
 簡單說明：
 
 - `Vault` 是這題唯一的 Secret Provider，ESO 和 CSI 兩條路線都從這裡取值。
-- `External Secrets Operator` 透過 `SecretStore + ExternalSecret` 定期向 Vault 讀資料，再同步成 `eso-demo-secret`。
-- `Secrets Store CSI Driver` 搭配 `Vault CSI Provider` 與 `SecretProviderClass`，把 Vault 內容掛進 Pod，也同步成 `csi-demo-secret`。
-- `csi-demo-sa` 的 ServiceAccount token 會用來走 Vault 的 Kubernetes auth，讓 CSI 路線不用額外硬塞 Vault token 進 Pod。
-- `Reloader` 會監看 `eso-demo-secret` 與 `csi-demo-secret`，一旦 Secret 內容變更，就幫對應 Deployment 做 rolling restart。
-- 所以這題最後驗證的是兩件事：Secret 有沒有刷新，以及重啟後的新 Pod 有沒有真的讀到更新後的值。
+- `ESO` 的角色是「把外部 secret 轉成 Kubernetes Secret」。
+- `CSI Driver` 的角色是「把 secret 掛進 Pod」，並且可選擇再同步成 Kubernetes Secret。
+- `Vault CSI Provider` 是 CSI Driver 連到 Vault 的轉接層。
+- `csi-demo-sa` 的 ServiceAccount token 會用來走 Vault 的 Kubernetes auth，所以 CSI 路線不用額外硬塞 Vault token 到 Pod 裡。
+- `Reloader` 不是拿 secret 的元件，它的工作是看到 Secret 內容變更後，幫 Deployment 做 rolling restart。
 
 ## Repository 內容
 
